@@ -5,11 +5,6 @@ import android.content.Context
 class Prefs(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("enyaqtube", Context.MODE_PRIVATE)
 
-    /** Während der Fahrt nur den Ton weiterlaufen lassen (Bild bleibt schwarz). */
-    var audioWhileDriving: Boolean
-        get() = sp.getBoolean("audio_while_driving", false)
-        set(v) = sp.edit().putBoolean("audio_while_driving", v).apply()
-
     /** Im Auto die Desktop-Version von YouTube statt der mobilen anzeigen. */
     var desktopInCar: Boolean
         get() = sp.getBoolean("desktop_in_car", false)

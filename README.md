@@ -15,9 +15,8 @@ weitergegeben.
   auch im Auto.
 * **Werbung:** Werbeserver werden blockiert, und Werbung wird aus den Player-Daten
   entfernt. Falls doch eine erscheint, wird sie sofort übersprungen.
-* **Fahrsperre:** Ab ca. 10 km/h wird das Bild schwarz und das Video pausiert. Die
-  Geschwindigkeit kommt vom Auto und vom GPS des Handys. Optional läuft nur der Ton
-  weiter (Schalter in der Handy-App). Die Sperre lässt sich nicht abschalten.
+* **Keine Fahrsperre:** Videos laufen auch während der Fahrt. Der Fahrer darf nicht
+  hinschauen (§ 23 Abs. 1a StVO). Die Nutzung erfolgt auf eigene Verantwortung.
 
 ## Installation
 
@@ -25,7 +24,7 @@ weitergegeben.
    `EnyaqTube.apk` laden. Alternativ: *Actions → letzter Lauf → Artifacts*.
 2. **Installieren:** APK öffnen und „Installation aus unbekannten Quellen“ für den
    Browser bzw. Dateimanager erlauben.
-3. **App öffnen** und Standort erlauben (für die Fahrsperre). Dann auf **Anmelden**
+3. **App öffnen**, auf **Anmelden**
    tippen und mit dem Google-Konto einloggen.
 4. **Android Auto Entwicklermodus:**
    Einstellungen → Apps → Android Auto → *Weitere Einstellungen in der App*

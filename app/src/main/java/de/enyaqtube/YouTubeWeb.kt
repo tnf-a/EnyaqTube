@@ -105,8 +105,6 @@ object YouTubeWeb {
 
     const val JS_PLAY_PAUSE =
         "(function(){var v=document.querySelector('video');if(!v)return;if(v.paused)v.play();else v.pause();})()"
-    const val JS_PAUSE =
-        "(function(){var v=document.querySelector('video');if(v)v.pause();})()"
 
     fun jsSeek(seconds: Int) =
         "(function(){var v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime+($seconds));})()"

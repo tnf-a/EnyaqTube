@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Display
-import android.view.Gravity
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
@@ -20,7 +19,6 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.FrameLayout
-import android.widget.TextView
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -48,9 +46,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     private var height = 0
     private var visibleArea: Rect? = null
 
-    var locked = false
-        private set
-
     // ---------------------------------------------------------------- Surface
 
     override fun onSurfaceAvailable(container: SurfaceContainer) {
@@ -69,7 +64,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
             virtualDisplay = created
             presentation = BrowserPresentation(carContext, created.display, desktop).also {
                 it.show()
-                it.setLocked(locked, prefs.audioWhileDriving)
                 pendingUrl?.let { url -> it.web.loadUrl(url) }
                 pendingUrl = null
             }
@@ -102,7 +96,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     // ---------------------------------------------------------------- Touch
 
     override fun onClick(x: Float, y: Float) {
-        if (locked) return
         val t = SystemClock.uptimeMillis()
         dispatch(MotionEvent.ACTION_DOWN, t, t, x, y)
         dispatch(MotionEvent.ACTION_UP, t, t + 60, x, y)
@@ -115,7 +108,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     private val endDrag = Runnable { finishDrag() }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
-        if (locked) return
         val now = SystemClock.uptimeMillis()
         if (!dragging) {
             val area = visibleArea ?: Rect(0, 0, width, height)
@@ -173,27 +165,16 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     }
 
     fun playPause() {
-        if (locked && !prefs.audioWhileDriving) return
         presentation?.web?.evaluateJavascript(YouTubeWeb.JS_PLAY_PAUSE, null)
     }
 
     fun seek(seconds: Int) {
-        if (locked) return
         presentation?.web?.evaluateJavascript(YouTubeWeb.jsSeek(seconds), null)
     }
 
-    fun setLocked(value: Boolean) {
-        locked = value
-        if (value) finishDrag()
-        val audio = prefs.audioWhileDriving
-        presentation?.let {
-            it.setLocked(value, audio)
-            if (value && !audio) it.web.evaluateJavascript(YouTubeWeb.JS_PAUSE, null)
-        }
-    }
 }
 
-/** Fenster auf dem virtuellen Display: WebView + Vollbild-Container + Fahrsperre-Hinweis. */
+/** Fenster auf dem virtuellen Display: WebView + Vollbild-Container. */
 private class BrowserPresentation(
     outer: Context,
     display: Display,
@@ -203,7 +184,6 @@ private class BrowserPresentation(
     lateinit var web: WebView
         private set
     private lateinit var fullscreen: FrameLayout
-    private lateinit var overlay: TextView
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
 
@@ -232,25 +212,7 @@ private class BrowserPresentation(
         }
         root.addView(fullscreen, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
-        overlay = TextView(context).apply {
-            setBackgroundColor(Color.BLACK)
-            setTextColor(Color.WHITE)
-            textSize = 22f
-            gravity = Gravity.CENTER
-            visibility = View.GONE
-            isClickable = true // schluckt Berührungen
-        }
-        root.addView(overlay, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-
         setContentView(root, ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-    }
-
-    fun setLocked(locked: Boolean, audioOnly: Boolean) {
-        overlay.text = if (audioOnly)
-            "Während der Fahrt nur Ton.\nDas Bild erscheint wieder, sobald du stehst."
-        else
-            "Video pausiert – während der Fahrt nicht verfügbar.\nEs geht weiter, sobald du stehst."
-        overlay.visibility = if (locked) View.VISIBLE else View.GONE
     }
 
     /** @return true, wenn ein Vollbild-Video geschlossen wurde. */

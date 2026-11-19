@@ -1,8 +1,6 @@
 package de.enyaqtube
 
-import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -64,9 +62,6 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, v -> onChange(v) }
             root.addView(this, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
-        switch("Ton während der Fahrt weiterspielen (Bild bleibt schwarz)", prefs.audioWhileDriving) {
-            prefs.audioWhileDriving = it
-        }
         switch("Desktop-Ansicht im Auto", prefs.desktopInCar) {
             prefs.desktopInCar = it
             toast("Wird beim nächsten Start im Auto übernommen")
@@ -81,7 +76,6 @@ class MainActivity : Activity() {
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl(YouTubeWeb.MOBILE_HOME)
 
-        requestLocationIfNeeded()
         updateStatus()
     }
 
@@ -98,26 +92,9 @@ class MainActivity : Activity() {
         toast("Abgemeldet")
     }
 
-    private fun requestLocationIfNeeded() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 1
-            )
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, results)
-        updateStatus()
-    }
-
     private fun updateStatus() {
-        val gps = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        status.text = buildString {
-            append("Hier einmal anmelden – danach in Android Auto „EnyaqTube“ öffnen. ")
-            append("Zoom im Auto: ${prefs.carZoom} %. ")
-            if (!gps) append("\n⚠ Standort-Berechtigung fehlt: Die Fahrsperre nutzt dann nur die Geschwindigkeit vom Auto.")
-        }
+        status.text = "Hier einmal anmelden – danach in Android Auto „EnyaqTube“ öffnen. " +
+            "Zoom im Auto: ${prefs.carZoom} %."
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

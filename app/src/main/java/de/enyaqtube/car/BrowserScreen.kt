@@ -2,7 +2,6 @@ package de.enyaqtube.car
 
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
-import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
@@ -22,20 +21,14 @@ import de.enyaqtube.R
 class BrowserScreen(carContext: CarContext) : Screen(carContext) {
 
     private val browser = CarBrowser(carContext)
-    private val drivingLock = DrivingLock(carContext) { locked ->
-        browser.setLocked(locked)
-        if (locked) CarToast.makeText(carContext, "Fahrsperre aktiv", CarToast.LENGTH_SHORT).show()
-    }
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(browser)
-                drivingLock.start()
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
-                drivingLock.stop()
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 browser.release()
             }
