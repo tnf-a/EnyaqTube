@@ -33,7 +33,7 @@ import de.enyaqtube.YouTubeWeb
  * Berührungen am Autodisplay kommen als Callbacks an und werden als Touch-Events an die
  * WebView weitergereicht.
  */
-class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
+class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKeys.Target {
 
     private val prefs = Prefs(carContext)
     private val handler = Handler(Looper.getMainLooper())
@@ -45,6 +45,15 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     private var width = 0
     private var height = 0
     private var visibleArea: Rect? = null
+
+    /** Bildschirm per Lenkradtaste schwarz geschaltet und Video pausiert. */
+    private var blanked = false
+
+    init {
+        MediaKeys.target = this
+        MediaKeys.activate(carContext)
+        MediaKeys.setPlaying(true)
+    }
 
     // ---------------------------------------------------------------- Surface
 
@@ -64,6 +73,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
             virtualDisplay = created
             presentation = BrowserPresentation(carContext, created.display, desktop).also {
                 it.show()
+                it.setBlanked(blanked)
                 pendingUrl?.let { url -> it.web.loadUrl(url) }
                 pendingUrl = null
             }
@@ -82,6 +92,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     }
 
     fun release() {
+        MediaKeys.deactivate()
         handler.removeCallbacksAndMessages(null)
         presentation?.let {
             it.web.stopLoading()
@@ -96,6 +107,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     // ---------------------------------------------------------------- Touch
 
     override fun onClick(x: Float, y: Float) {
+        if (blanked) { onPlayKey(); return } // Tippen auf den schwarzen Bildschirm = weiter
         val t = SystemClock.uptimeMillis()
         dispatch(MotionEvent.ACTION_DOWN, t, t, x, y)
         dispatch(MotionEvent.ACTION_UP, t, t + 60, x, y)
@@ -108,6 +120,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
     private val endDrag = Runnable { finishDrag() }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (blanked) return
         val now = SystemClock.uptimeMillis()
         if (!dragging) {
             val area = visibleArea ?: Rect(0, 0, width, height)
@@ -172,6 +185,29 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback {
         presentation?.web?.evaluateJavascript(YouTubeWeb.jsSeek(seconds), null)
     }
 
+    // ---------------------------------------------------------------- Lenkradtaste
+
+    /** Pause: Video anhalten und Bildschirm schwarz. */
+    override fun onPauseKey() {
+        blanked = true
+        finishDrag()
+        presentation?.let {
+            it.web.evaluateJavascript(YouTubeWeb.JS_PAUSE, null)
+            it.setBlanked(true)
+        }
+        MediaKeys.setPlaying(false)
+    }
+
+    /** Nochmal drücken: Bild wieder an und weiterspielen. */
+    override fun onPlayKey() {
+        blanked = false
+        presentation?.let {
+            it.setBlanked(false)
+            it.web.evaluateJavascript(YouTubeWeb.JS_PLAY, null)
+        }
+        MediaKeys.setPlaying(true)
+    }
+
 }
 
 /** Fenster auf dem virtuellen Display: WebView + Vollbild-Container. */
@@ -184,6 +220,7 @@ private class BrowserPresentation(
     lateinit var web: WebView
         private set
     private lateinit var fullscreen: FrameLayout
+    private lateinit var blackout: View
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
 
@@ -212,7 +249,17 @@ private class BrowserPresentation(
         }
         root.addView(fullscreen, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
+        blackout = View(context).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.GONE
+        }
+        root.addView(blackout, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+
         setContentView(root, ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+    }
+
+    fun setBlanked(value: Boolean) {
+        blackout.visibility = if (value) View.VISIBLE else View.GONE
     }
 
     /** @return true, wenn ein Vollbild-Video geschlossen wurde. */

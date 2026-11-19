@@ -39,5 +39,14 @@
                 <category android:name="androidx.car.app.category.NAVIGATION" />
             </intent-filter>
         </service>
+
+        <!-- Damit Android Auto die Lenkradtasten an EnyaqTube schickt -->
+        <service
+            android:name=".car.MediaKeyService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

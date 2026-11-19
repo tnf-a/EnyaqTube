@@ -46,6 +46,11 @@ weitergegeben.
 | ⟲ / ⏯ / ⟳ | 10 s zurück, Play/Pause, 10 s vor |
 | ✥ | Verschiebemodus (falls Wischen sonst nicht ankommt) |
 
+**Lenkradtaste Play/Pause:** Einmal drücken hält das Video an und schaltet die Anzeige
+schwarz. Nochmal drücken (oder auf den schwarzen Bildschirm tippen) spielt weiter.
+Falls die Taste nichts tut: In Android Auto einmal kurz **EnyaqTube** als Mediaquelle
+wählen (Medien-Symbol). Danach landen die Tasten bei EnyaqTube.
+
 Seite zu klein oder zu groß? In der Handy-App **Zoom − / Zoom +** tippen und die App
 im Auto neu starten.
 

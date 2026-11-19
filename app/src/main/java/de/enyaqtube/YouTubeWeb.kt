@@ -103,6 +103,10 @@ object YouTubeWeb {
 
     // --- Player-Steuerung -------------------------------------------------------
 
+    const val JS_PAUSE =
+        "(function(){var v=document.querySelector('video');if(v)v.pause();})()"
+    const val JS_PLAY =
+        "(function(){var v=document.querySelector('video');if(v)v.play();})()"
     const val JS_PLAY_PAUSE =
         "(function(){var v=document.querySelector('video');if(!v)return;if(v.paused)v.play();else v.pause();})()"
 
