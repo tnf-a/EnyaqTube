@@ -108,6 +108,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
 
     override fun onClick(x: Float, y: Float) {
         if (blanked) { onPlayKey(); return } // Tippen auf den schwarzen Bildschirm = weiter
+        reclaimMedia()
         val t = SystemClock.uptimeMillis()
         dispatch(MotionEvent.ACTION_DOWN, t, t, x, y)
         dispatch(MotionEvent.ACTION_UP, t, t + 60, x, y)
@@ -178,6 +179,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
     }
 
     fun playPause() {
+        reclaimMedia()
         presentation?.web?.evaluateJavascript(YouTubeWeb.JS_PLAY_PAUSE, null)
     }
 
@@ -201,10 +203,23 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
     /** Nochmal drücken: Bild wieder an und weiterspielen. */
     override fun onPlayKey() {
         blanked = false
+        MediaKeys.requestFocus(carContext)
         presentation?.let {
             it.setBlanked(false)
             it.web.evaluateJavascript(YouTubeWeb.JS_PLAY, null)
         }
+        MediaKeys.setPlaying(true)
+    }
+
+    /** Andere App spielt jetzt: Video anhalten, Bild bleibt an. */
+    override fun onFocusLost() {
+        presentation?.web?.evaluateJavascript(YouTubeWeb.JS_PAUSE, null)
+        MediaKeys.setPlaying(false)
+    }
+
+    /** Video gestartet (Touch/Knopf im Auto): Fokus und Lenkradtasten zurückholen. */
+    private fun reclaimMedia() {
+        MediaKeys.requestFocus(carContext)
         MediaKeys.setPlaying(true)
     }
 
