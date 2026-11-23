@@ -37,14 +37,21 @@ weitergegeben.
 
 ## Bedienung im Auto
 
+Oben links blendet EnyaqTube eigene Knöpfe ein. Sie verschwinden nach ein paar
+Sekunden und kommen bei der nächsten Berührung wieder.
+
 | Knopf | Funktion |
 |---|---|
 | Abos | Deine Abos-Übersicht |
 | Suche | Suchen mit der Android-Auto-Tastatur (nur im Stand) |
 | Zurück | Vollbild verlassen bzw. eine Seite zurück |
 | Start | YouTube-Startseite |
-| ⟲ / ⏯ / ⟳ | 10 s zurück, Play/Pause, 10 s vor |
-| ✥ | Verschiebemodus (falls Wischen sonst nicht ankommt) |
+| ⟲ 10 / ⏯ / 10 ⟳ | 10 s zurück, Play/Pause, 10 s vor |
+
+Von Android Auto selbst bleiben nur „Suche“ oben rechts und der Verschiebe-Knopf ✥.
+
+**Medienkarte:** Läuft z. B. Maps im Vordergrund, zeigt die kleine EnyaqTube-Karte
+Titel, Kanal, Vorschaubild und Fortschritt. Vor/Zurück springt 10 s.
 
 **Lenkradtaste Play/Pause:** Einmal drücken hält das Video an und schaltet die Anzeige
 schwarz. Nochmal drücken (oder auf den schwarzen Bildschirm tippen) spielt weiter.

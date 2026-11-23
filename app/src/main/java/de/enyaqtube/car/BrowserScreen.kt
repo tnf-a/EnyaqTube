@@ -5,22 +5,25 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
-import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.Row
 import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.NavigationTemplate
-import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import de.enyaqtube.Prefs
-import de.enyaqtube.R
 
-/** Hauptbildschirm im Auto: YouTube auf der ganzen Fläche, Knöpfe am Rand. */
+/**
+ * Hauptbildschirm im Auto: YouTube auf der ganzen Fläche. Die Bedienknöpfe zeichnet
+ * EnyaqTube selbst oben links; von Android Auto bleiben nur "Suche" (braucht die
+ * Android-Auto-Tastatur) und der Verschiebe-Knopf.
+ */
 class BrowserScreen(carContext: CarContext) : Screen(carContext) {
 
-    private val browser = CarBrowser(carContext)
+    private val browser: CarBrowser = CarBrowser(carContext) { openSearch() }
+
+    private fun openSearch() = screenManager.push(SearchScreen(carContext, browser))
 
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -38,25 +41,13 @@ class BrowserScreen(carContext: CarContext) : Screen(carContext) {
     private fun text(title: String, onClick: () -> Unit) =
         Action.Builder().setTitle(title).setOnClickListener(onClick).build()
 
-    private fun icon(res: Int, onClick: () -> Unit) =
-        Action.Builder()
-            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, res)).build())
-            .setOnClickListener(onClick)
-            .build()
-
     override fun onGetTemplate(): Template {
         val actions = ActionStrip.Builder()
-            .addAction(text("Abos") { browser.subscriptions() })
-            .addAction(text("Suche") { screenManager.push(SearchScreen(carContext, browser)) })
-            .addAction(text("Zurück") { browser.back() })
-            .addAction(text("Start") { browser.home() })
+            .addAction(text("Suche") { openSearch() })
             .build()
 
         val playerActions = ActionStrip.Builder()
             .addAction(Action.PAN)
-            .addAction(icon(R.drawable.ic_replay) { browser.seek(-10) })
-            .addAction(icon(R.drawable.ic_play_pause) { browser.playPause() })
-            .addAction(icon(R.drawable.ic_forward) { browser.seek(10) })
             .build()
 
         return NavigationTemplate.Builder()

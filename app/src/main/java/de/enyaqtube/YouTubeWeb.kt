@@ -47,6 +47,7 @@ object YouTubeWeb {
         context: Context,
         desktop: Boolean,
         chromeClient: WebChromeClient? = null,
+        extraScript: String? = null,
     ): WebView {
         val web = WebView(context)
         web.setBackgroundColor(Color.BLACK)
@@ -73,6 +74,11 @@ object YouTubeWeb {
             WebViewCompat.addDocumentStartJavaScript(
                 web, AdBlocker.SCRIPT, setOf("https://*.youtube.com", "https://youtube.com")
             )
+            extraScript?.let {
+                WebViewCompat.addDocumentStartJavaScript(
+                    web, it, setOf("https://*.youtube.com", "https://youtube.com")
+                )
+            }
         }
 
         web.webViewClient = object : WebViewClient() {
@@ -94,6 +100,7 @@ object YouTubeWeb {
             override fun onPageFinished(view: WebView, url: String?) {
                 // Sicherheitsnetz, falls das Skript noch nicht läuft (z. B. ältere WebView).
                 view.evaluateJavascript(AdBlocker.SCRIPT, null)
+                extraScript?.let { view.evaluateJavascript(it, null) }
                 CookieManager.getInstance().flush()
             }
         }
@@ -109,6 +116,47 @@ object YouTubeWeb {
         "(function(){var v=document.querySelector('video');if(v)v.play();})()"
     const val JS_PLAY_PAUSE =
         "(function(){var v=document.querySelector('video');if(!v)return;if(v.paused)v.play();else v.pause();})()"
+
+    fun jsSeekTo(ms: Long) =
+        "(function(){var v=document.querySelector('video');if(v)v.currentTime=${ms / 1000.0};})()"
+
+    /**
+     * Meldet den Player-Zustand (läuft?, Video-ID, Titel, Kanal, Position, Länge)
+     * an die App, damit die Medienkarte in Android Auto aktuell ist.
+     */
+    val STATE_SCRIPT = """
+(function () {
+  if (window.__enyaqState) return;
+  window.__enyaqState = true;
+  var last = '';
+  function report() {
+    try {
+      if (!window.EnyaqBridge) return;
+      var v = document.querySelector('video');
+      var id = '';
+      try { id = new URL(location.href).searchParams.get('v') || ''; } catch (e) {}
+      if (!id) { var m = location.pathname.match(/^\/shorts\/([^\/?]+)/); if (m) id = m[1]; }
+      var title = (document.title || '').replace(/ - YouTube$/, '');
+      var ch = document.querySelector(
+        'ytm-slim-owner-renderer .slim-owner-channel-name, .slim-owner-channel-name, ' +
+        '#owner #channel-name a, ytd-video-owner-renderer ytd-channel-name a');
+      var channel = ch ? ch.textContent.trim() : '';
+      var ad = !!document.querySelector('.ad-showing, .ad-interrupting');
+      var playing = !!(v && !v.paused && !v.ended);
+      var pos = v ? Math.floor(v.currentTime * 1000) : 0;
+      var dur = (v && isFinite(v.duration)) ? Math.floor(v.duration * 1000) : 0;
+      var key = [playing, id, title, channel, Math.floor(pos / 1000), Math.floor(dur / 1000), ad].join('|');
+      if (key === last) return;
+      last = key;
+      if (!ad) EnyaqBridge.onState(playing, id, title, channel, pos, dur);
+    } catch (e) {}
+  }
+  document.addEventListener('play', report, true);
+  document.addEventListener('pause', report, true);
+  document.addEventListener('ended', report, true);
+  setInterval(report, 1000);
+})();
+""".trimIndent()
 
     fun jsSeek(seconds: Int) =
         "(function(){var v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime+($seconds));})()"

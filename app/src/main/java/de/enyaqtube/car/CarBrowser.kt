@@ -1,24 +1,32 @@
 package de.enyaqtube.car
 
+import android.annotation.SuppressLint
 import android.app.Presentation
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.Display
+import android.view.Gravity
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -33,7 +41,10 @@ import de.enyaqtube.YouTubeWeb
  * Berührungen am Autodisplay kommen als Callbacks an und werden als Touch-Events an die
  * WebView weitergereicht.
  */
-class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKeys.Target {
+class CarBrowser(
+    private val carContext: CarContext,
+    private val onSearchRequested: () -> Unit,
+) : SurfaceCallback, MediaKeys.Target {
 
     private val prefs = Prefs(carContext)
     private val handler = Handler(Looper.getMainLooper())
@@ -52,7 +63,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
     init {
         MediaKeys.target = this
         MediaKeys.activate(carContext)
-        MediaKeys.setPlaying(true)
     }
 
     // ---------------------------------------------------------------- Surface
@@ -71,12 +81,13 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
             )
             virtualDisplay = created
-            presentation = BrowserPresentation(carContext, created.display, desktop).also {
-                it.show()
-                it.setBlanked(blanked)
-                pendingUrl?.let { url -> it.web.loadUrl(url) }
-                pendingUrl = null
-            }
+            presentation = BrowserPresentation(carContext, created.display, desktop, toolbarActions(), Bridge())
+                .also {
+                    it.show()
+                    it.setBlanked(blanked)
+                    pendingUrl?.let { url -> it.web.loadUrl(url) }
+                    pendingUrl = null
+                }
         } else {
             vd.resize(width, height, dpi)
             vd.surface = surface
@@ -104,14 +115,24 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
         virtualDisplay = null
     }
 
+    private fun toolbarActions() = listOf(
+        "Abos" to { subscriptions() },
+        "Suche" to { onSearchRequested() },
+        "Zurück" to { back() },
+        "Start" to { home() },
+        "⟲ 10" to { seek(-10) },
+        "⏯" to { playPause() },
+        "10 ⟳" to { seek(10) },
+    )
+
     // ---------------------------------------------------------------- Touch
 
     override fun onClick(x: Float, y: Float) {
         if (blanked) { onPlayKey(); return } // Tippen auf den schwarzen Bildschirm = weiter
-        reclaimMedia()
         val t = SystemClock.uptimeMillis()
         dispatch(MotionEvent.ACTION_DOWN, t, t, x, y)
         dispatch(MotionEvent.ACTION_UP, t, t + 60, x, y)
+        presentation?.showToolbar() // erst danach, sonst trifft der Tipp die gerade eingeblendete Leiste
     }
 
     private var dragging = false
@@ -179,7 +200,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
     }
 
     fun playPause() {
-        reclaimMedia()
         presentation?.web?.evaluateJavascript(YouTubeWeb.JS_PLAY_PAUSE, null)
     }
 
@@ -187,7 +207,7 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
         presentation?.web?.evaluateJavascript(YouTubeWeb.jsSeek(seconds), null)
     }
 
-    // ---------------------------------------------------------------- Lenkradtaste
+    // ---------------------------------------------------------------- Lenkradtaste / Medienkarte
 
     /** Pause: Video anhalten und Bildschirm schwarz. */
     override fun onPauseKey() {
@@ -203,7 +223,6 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
     /** Nochmal drücken: Bild wieder an und weiterspielen. */
     override fun onPlayKey() {
         blanked = false
-        MediaKeys.requestFocus(carContext)
         presentation?.let {
             it.setBlanked(false)
             it.web.evaluateJavascript(YouTubeWeb.JS_PLAY, null)
@@ -211,33 +230,42 @@ class CarBrowser(private val carContext: CarContext) : SurfaceCallback, MediaKey
         MediaKeys.setPlaying(true)
     }
 
-    /** Andere App spielt jetzt: Video anhalten, Bild bleibt an. */
-    override fun onFocusLost() {
-        presentation?.web?.evaluateJavascript(YouTubeWeb.JS_PAUSE, null)
-        MediaKeys.setPlaying(false)
+    override fun onSeekBy(seconds: Int) = seek(seconds)
+
+    override fun onSeekTo(ms: Long) {
+        presentation?.web?.evaluateJavascript(YouTubeWeb.jsSeekTo(ms), null)
     }
 
-    /** Video gestartet (Touch/Knopf im Auto): Fokus und Lenkradtasten zurückholen. */
-    private fun reclaimMedia() {
-        MediaKeys.requestFocus(carContext)
-        MediaKeys.setPlaying(true)
+    /** Wird vom Skript im YouTube-Player aufgerufen (Hintergrund-Thread). */
+    private inner class Bridge {
+        @JavascriptInterface
+        fun onState(playing: Boolean, id: String, title: String, channel: String, pos: Double, dur: Double) {
+            handler.post {
+                MediaKeys.onPlayerState(playing && !blanked, id, title, channel, pos.toLong(), dur.toLong())
+            }
+        }
     }
-
 }
 
-/** Fenster auf dem virtuellen Display: WebView + Vollbild-Container. */
+/** Fenster auf dem virtuellen Display: WebView, Knopfleiste, Vollbild-Container, Schwarzbild. */
+@SuppressLint("JavascriptInterface")
 private class BrowserPresentation(
     outer: Context,
     display: Display,
     private val desktop: Boolean,
+    private val actions: List<Pair<String, () -> Unit>>,
+    private val bridge: Any,
 ) : Presentation(outer, display, android.R.style.Theme_Black_NoTitleBar_Fullscreen) {
 
     lateinit var web: WebView
         private set
     private lateinit var fullscreen: FrameLayout
+    private lateinit var toolbar: LinearLayout
     private lateinit var blackout: View
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideToolbar = Runnable { toolbar.animate().alpha(0f).withEndAction { toolbar.visibility = View.INVISIBLE } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -255,7 +283,8 @@ private class BrowserPresentation(
             override fun onHideCustomView() {
                 removeCustomView()
             }
-        })
+        }, YouTubeWeb.STATE_SCRIPT)
+        web.addJavascriptInterface(bridge, "EnyaqBridge")
         root.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
         fullscreen = FrameLayout(context).apply {
@@ -264,6 +293,30 @@ private class BrowserPresentation(
         }
         root.addView(fullscreen, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
+        // Eigene Knopfleiste oben links (die Android-Auto-Knöpfe sitzen fest oben rechts
+        // und verdecken dort die Player-Einstellungen). Blendet sich nach ein paar
+        // Sekunden aus und erscheint bei der nächsten Berührung wieder.
+        toolbar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+        }
+        actions.forEach { (label, onClick) ->
+            toolbar.addView(TextView(context).apply {
+                text = label
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                gravity = Gravity.CENTER
+                minWidth = dp(52)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(20).toFloat()
+                    setColor(Color.argb(170, 30, 30, 30))
+                }
+                setOnClickListener { showToolbar(); onClick() }
+            }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginEnd = dp(6) })
+        }
+        root.addView(toolbar, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.START))
+
         blackout = View(context).apply {
             setBackgroundColor(Color.BLACK)
             visibility = View.GONE
@@ -271,6 +324,15 @@ private class BrowserPresentation(
         root.addView(blackout, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
         setContentView(root, ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        showToolbar()
+    }
+
+    fun showToolbar() {
+        handler.removeCallbacks(hideToolbar)
+        toolbar.animate().cancel()
+        toolbar.alpha = 1f
+        toolbar.visibility = View.VISIBLE
+        handler.postDelayed(hideToolbar, 6_000)
     }
 
     fun setBlanked(value: Boolean) {
@@ -291,4 +353,6 @@ private class BrowserPresentation(
         customCallback = null
         fullscreen.visibility = View.GONE
     }
+
+    private fun dp(v: Int) = (v * context.resources.displayMetrics.density).toInt()
 }
